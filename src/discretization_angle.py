@@ -3,14 +3,26 @@ import matplotlib.pyplot as plt
 
 
 class DiscretizationAngle():
-    def __init__(self, n) -> None:
-        if (n % 2 != 0):
+    """A class to discretize the angle space.
+    the discretization scheme ref: https://doi.org/10.1016/S0017-9310(99)00211-2
+    """
+
+    def __init__(self, num_theta: int) -> None:
+        """
+
+        Args:
+            num_theta (int): the number of discretization in theta direction. And the number of phi is 4, 8, 12, ..., 2N - 4, 2N, 2N , 2N - 4, ..., 8, 4
+
+        Raises:
+            ValueError: if num_theta is odd
+        """
+        if (num_theta % 2 != 0):
             raise ValueError("n must be even")
-        self.num_theta = n
-        self.delta_theta = np.pi / n
-        self.num_phi = self._get_num_phi_array(n)
+        self.num_theta = num_theta
+        self.delta_theta = np.pi / num_theta
+        self.num_phi_arr = self._get_num_phi_array(num_theta)
         self.num_omega = self.num_theta * (self.num_theta + 2)
-        assert self.num_omega == np.sum(self.num_phi)
+        assert self.num_omega == np.sum(self.num_phi_arr)
 
     def _get_num_phi_array(self, n: int) -> np.array([int]):
         if (n % 2 != 0):
@@ -20,42 +32,75 @@ class DiscretizationAngle():
             [int(4 * (i+1)) for i in range(num)] + [int(4 * (i)) for i in range(num, 0, -1)])
         return num_phi
 
-    def get_omega(self, t: int, p: int) -> float:
-        theta = self.get_theta(t)
-        phi = self.get_phi(t, p)
-        delta_phi = 2 * np.pi / self.num_phi[t]
+    def get_omega(self, theta_index: int, p_index: int) -> float:
+        theta = self.get_theta(theta_index)
+        delta_phi = 2 * np.pi / self.num_phi_arr[theta_index]
         return delta_phi * (
             np.cos(theta - (self.delta_theta) / 2) -
             np.cos(theta + (self.delta_theta) / 2)
         )
 
-    def get_vec_s(self, t: int, p: int) -> np.array([float]):
-        theta_s = self.get_theta(t)
-        phi_s = self.get_phi(t, p)
+    def get_vec_s(self, theta_index: int, phi_index: int) -> np.array([float]):
+        """get the solid angle vector
+        """
+        theta_s = self.get_theta(theta_index)
+        phi_s = self.get_phi(theta_index, phi_index)
         return np.array([
             np.sin(theta_s) * np.cos(phi_s),
             np.sin(theta_s) * np.sin(phi_s),
             np.cos(theta_s)
         ])
 
-    def get_theta(self, t) -> float:
+    def get_theta(self, t: int) -> float:
         assert t < self.num_theta
         return (t+0.5) * self.delta_theta
 
-    def get_phi(self, t, p) -> float:
-        assert p < self.num_phi[t]
+    def get_phi(self, t: int, p: int) -> float:
+        assert p < self.num_phi_arr[t]
         delta_phi = self.get_delta_phi(t)
         return (p+0.5) * delta_phi
 
-    def get_delta_phi(self, t) -> float:
+    def get_delta_phi(self, t: int) -> float:
         assert t < self.num_theta
-        return 2 * np.pi / self.num_phi[t]
+        return 2 * np.pi / self.num_phi_arr[t]
 
-    def get_vec_s_array(self) -> np.array([float]):
-        return np.array([self.get_vec_s(t, p) for t in range(self.num_theta) for p in range(self.num_phi[t])])
+    def get_delta_omega(self, omega_index: int) -> float:
+        theta_index = self.get_theta_index_from_omega_index(omega_index)
+        theta = self.get_theta(theta_index)
+        # return np.sin(theta) * self.delta_theta * self.get_delta_phi(theta_index)
+        delta_theta = self.delta_theta
+        delta_phi = self.get_delta_phi(theta_index)
+        return delta_phi * (np.cos(theta - delta_theta / 2) - np.cos(theta + delta_theta / 2))
+
+    def get_theta_array(self) -> np.array([float]):
+        return np.array([self.get_theta(t) for t in range(self.num_theta)])
 
     def get_omega_array(self) -> np.array([float]):
-        return np.array([self.get_omega(t, p) for t in range(self.num_theta) for p in range(self.num_phi[t])])
+        return np.array([self.get_omega(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
+
+    def get_vec_s_array(self) -> np.array([float]):
+        return np.array([self.get_vec_s(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
+
+    def get_omega_array(self) -> np.array([float]):
+        return np.array([self.get_omega(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
+
+    def get_omega_index(self, theta_index: int, phi_index: int) -> int:
+        return np.sum(self.num_phi_arr[:theta_index]) + phi_index
+
+    def get_theta_index_from_omega_index(self, omega_index: int) -> int:
+        upper_index = 0
+        for res, add_index in enumerate(self.num_phi_arr):
+            upper_index += add_index
+            if (omega_index < upper_index):
+                break
+        return res
+
+    def get_phi_index_from_omega_index(self, omega_index: int) -> int:
+        theta_index = self.get_theta_index_from_omega_index(omega_index)
+        return (omega_index - np.sum(self.num_phi_arr[:theta_index]))
+
+    def get_phi_index_from_omega_index_and_theta_index(self, omega_index, theta_index) -> int:
+        return omega_index - np.sum(self.num_phi_arr[:theta_index])
 
     # Tool for debug
     def _validate_omega_array(omega_array: np.array([float])) -> bool:
