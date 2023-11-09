@@ -17,6 +17,7 @@ class GridFace():
         """D^m_j = {vec{s} \cdot vec{n}} \cdot \Omega^m
         """
         return np.dot(self.norm_vec, s_vec) * omega
+        # return integrate.quad(lambda x: np.dot(self.norm_vec, s_vec) * x, omega - 0.5*delta_omega, omega + 0.5*delta_omega)[0]
 
     def calculate_a(self, s_vec: np.array([float]), omega: float) -> float:
         """a^m_j = area_j * D^m_j

@@ -32,13 +32,17 @@ class DiscretizationAngle():
             [int(4 * (i+1)) for i in range(num)] + [int(4 * (i)) for i in range(num, 0, -1)])
         return num_phi
 
-    def get_omega(self, theta_index: int, p_index: int) -> float:
+    def get_omega_by_theta_index(self, theta_index: int) -> float:
         theta = self.get_theta(theta_index)
-        delta_phi = 2 * np.pi / self.num_phi_arr[theta_index]
+        delta_phi = self.get_delta_phi(theta_index)
         return delta_phi * (
             np.cos(theta - (self.delta_theta) / 2) -
             np.cos(theta + (self.delta_theta) / 2)
         )
+
+    def get_omega(self, omega_index: int) -> float:
+        theta_index = self.get_theta_index_from_omega_index(omega_index)
+        return self.get_omega_by_theta_index(theta_index)
 
     def get_vec_s(self, theta_index: int, phi_index: int) -> np.array([float]):
         """get the solid angle vector
@@ -64,14 +68,6 @@ class DiscretizationAngle():
         assert t < self.num_theta
         return 2 * np.pi / self.num_phi_arr[t]
 
-    def get_delta_omega(self, omega_index: int) -> float:
-        theta_index = self.get_theta_index_from_omega_index(omega_index)
-        theta = self.get_theta(theta_index)
-        # return np.sin(theta) * self.delta_theta * self.get_delta_phi(theta_index)
-        delta_theta = self.delta_theta
-        delta_phi = self.get_delta_phi(theta_index)
-        return delta_phi * (np.cos(theta - delta_theta / 2) - np.cos(theta + delta_theta / 2))
-
     def get_theta_array(self) -> np.array([float]):
         return np.array([self.get_theta(t) for t in range(self.num_theta)])
 
@@ -82,7 +78,7 @@ class DiscretizationAngle():
         return np.array([self.get_vec_s(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
 
     def get_omega_array(self) -> np.array([float]):
-        return np.array([self.get_omega(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
+        return np.array([self.get_omega_by_theta_index(t) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
 
     def get_omega_index(self, theta_index: int, phi_index: int) -> int:
         return np.sum(self.num_phi_arr[:theta_index]) + phi_index
@@ -105,3 +101,26 @@ class DiscretizationAngle():
     # Tool for debug
     def _validate_omega_array(omega_array: np.array([float])) -> bool:
         return np.sum(omega_array) == 4 * np.pi
+
+
+def test_d():
+    import scipy.integrate as integrate
+    def f(x): return np.sin(x)
+    d = DiscretizationAngle(10)
+    o_arr = d.get_omega_array()
+    for t in range(d.num_theta):
+        for p in range(d.num_phi_arr[t]):
+            o_i = d.get_omega_index(t, p)
+            dt = d.delta_theta
+            dp = d.get_delta_phi(t)
+            theta = d.get_theta(t)
+            phi = d.get_phi(t, p)
+
+            o_1 = 2 * dp * np.sin(theta) * np.sin(dt / 2)
+            o_2 = integrate.quad(f, theta - dt/2, theta + dt/2)[0] * dp
+            assert np.isclose(o_arr[o_i], o_1).all()
+            assert np.isclose(o_arr[o_i], o_2).all()
+
+
+if __name__ == "__main__":
+    test_d()

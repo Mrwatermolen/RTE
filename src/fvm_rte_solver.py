@@ -74,7 +74,7 @@ class FvmRteSolver():
         for t in range(num_theta):
             for p in range(self.discretization_angle.num_phi_arr[t]):
                 s_vec = self.discretization_angle.get_vec_s(t, p)
-                omega = self.discretization_angle.get_omega(t, p)
+                omega = self.discretization_angle.get_omega_by_theta_index(t)
                 omega_index = self.discretization_angle.get_omega_index(t, p)
                 x = self._solve_per_omega(s_vec, omega)
                 for grid in self.grid_coord.grid:
@@ -139,7 +139,7 @@ class FvmRteSolver():
         num_omega = len(intensity)
         s_vec_arr = self.discretization_angle.get_vec_s_array()
         d_omega = np.array(
-            [self.discretization_angle.get_delta_omega(i) for i in range(num_omega)])
+            [self.discretization_angle.get_omega(i) for i in range(num_omega)])
         res = np.sum(intensity * d_omega * np.dot(s_vec_arr, norm_vec))
         # TODO: This is a temporary solution
         while res.shape != ():
@@ -161,31 +161,13 @@ class FvmRteSolver():
         print(np.unique(v))
         plt.show()
 
-    def ony_for_debug_plot_black_body(self):
-        # TODO: unfinished
-        I = 0
-        counter = 0
-        num_omega = self.discretization_angle.num_omega
-        d_omega = np.array(
-            [self.discretization_angle.get_delta_omega(i) for i in range(num_omega)])
-        for g in self.grid_coord.grid:
-            assert g.intensity.shape == d_omega.shape
-            sum_I = np.sum(g.intensity * d_omega)
-            if sum_I != 0:
-                counter += 1
-            I += sum_I
-        print(counter)
-        print(f"I: {I}")
-        print(f"sigma T^4 {self.B }")
-        print(f"err ratio: {I/self.B}")
-
 
 def test_fvm_rte_solver():
     # Calculate domain size is 5*5*5
     # Background is transparent
     # Create a black body with a cube in the center
     g = GridCoordinate(1, 1, 1)
-    d = DiscretizationAngle(10)
+    d = DiscretizationAngle(50)
     f = FvmRteSolver()
     f.set_config_before_running(lambda_min=1e-7, lambda_max=1e-4,
                                 temperature=1000, grid_coordinate=g, discretization_angle=d)
@@ -205,11 +187,22 @@ def test_fvm_rte_solver():
     # f.only_for_debug_plot_radiative_flux_density()
 
     f.addObject(MaterialObject(
-        shape=Cube(origin=np.array([0, 0, 0]), end=np.array([5, 5, 5])), k=transparent_k))
+        shape=Cube(origin=np.array([0, 0, 0]), end=np.array([3,3,3])), k=transparent_k))
     f.addObject(MaterialObject(
-        shape=Cube(origin=np.array([2, 2, 2]), end=np.array([3, 3, 3])), k=black_k))
+        shape=Cube(origin=np.array([1,1,1]), end=np.array([2,2,2])), k=black_k))
     f.run()
-    f.ony_for_debug_plot_black_body()
+    I = 0
+    counter = 0
+    num_omega = f.discretization_angle.num_omega
+    d_omega = np.array(
+        [f.discretization_angle.get_omega(i) for i in range(num_omega)])
+    g = f.grid_coord.get_grid(1, 1, 1)
+    
+    assert g.intensity.shape == d_omega.shape
+    I = np.sum(g.intensity * d_omega)
+    print(counter)
+    print(f"err: {I - f.B * np.pi}")
+    print(f"relative err: {(I - f.B * np.pi) / (f.B * np.pi)}")
 
 
 if __name__ == "__main__":
