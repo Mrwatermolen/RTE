@@ -73,9 +73,9 @@ def compare_float(a: np.array([float]), op: FloatCompareOperator, b: np.array([f
     if op == FloatCompareOperator.EQUAL:
         return (np.abs(a - b) < epsilon).all()
     if op == FloatCompareOperator.LESS_THAN:
-        return (a < b - epsilon).all()
+        return (a < b).all()
     if op == FloatCompareOperator.GREATER_THAN:
-        return (a > b + epsilon).all()
+        return (a > b).all()
     if op == FloatCompareOperator.LESS_THAN_OR_EQUAL:
         return compare_float(a, FloatCompareOperator.EQUAL, b, epsilon) or compare_float(a, FloatCompareOperator.LESS_THAN, b, epsilon)
     if op == FloatCompareOperator.GREATER_THAN_OR_EQUAL:

@@ -28,7 +28,7 @@ class Cube(object):
     #     return self.center
 
     def isPointInside(self, point) -> bool:
-        return compare_float(self.origin, FloatCompareOperator.LESS_THAN_OR_EQUAL, point, self.eps)
+        return compare_float(self.origin, FloatCompareOperator.LESS_THAN_OR_EQUAL, point, self.eps) and compare_float(point, FloatCompareOperator.LESS_THAN_OR_EQUAL, self.end, self.eps)
 
 
 class Sphere(Cube):
