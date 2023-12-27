@@ -19,7 +19,7 @@ class GridCoordinate():
         self.grid = np.array([Grid(i, j, k, self.grid_size[0], self.grid_size[1], self.grid_size[2])
                              for i in range(self.nx) for j in range(self.ny) for k in range(self.nz)])
         # assert (self.grid.shape == (self.grid_num,))
-        self.grid_space_shape = np.array([self.nx, self.ny, self.nz])
+        
 
     def _calculate_grid_space(self):
         origin_p = np.array([np.inf, np.inf, np.inf])
@@ -32,7 +32,8 @@ class GridCoordinate():
         self.nx, self.ny, self.nz = np.ceil(
             self.size / self.grid_size).astype(int)
         self.grid_num = self.nx * self.ny * self.nz
-        self.end_point = self.origin_point + self.grid_num * self.grid_size
+        self.grid_space_shape = np.array([self.nx, self.ny, self.nz])
+        self.end_point = self.origin_point + self.grid_space_shape * self.grid_size
 
     def initObject(self, lambda_min: float, lambda_max: float):
         for obj in self.object_list:
@@ -52,6 +53,10 @@ class GridCoordinate():
 
     def get_grid(self, i, j, k) -> Grid:
         return self.grid[self.get_grid_flatten_index(i, j, k)]
+    
+    def get_grid_by_point(self, r: np.array([float])) -> Grid:
+        index = (np.round((r - self.origin_point) / self.grid_size))
+        return self.grid[self.get_grid_flatten_index(*index.astype(int))]
 
     def get_grid_by_flatten_index(self, flatten_index) -> Grid:
         return self.grid[flatten_index]

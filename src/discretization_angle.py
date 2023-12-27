@@ -120,7 +120,46 @@ def test_d():
             o_2 = integrate.quad(f, theta - dt/2, theta + dt/2)[0] * dp
             assert np.isclose(o_arr[o_i], o_1).all()
             assert np.isclose(o_arr[o_i], o_2).all()
-
+    # condition 1: \int_{4\pi} \mathrm{d} \Omega = 4\pi
+    print(f"4pi is {4*np.pi}")
+    print("$\int_{4\pi} \mathrm{d} \Omega = $", np.sum(o_arr))
+    # condition 2: \int_{4\pi} \vec{s} \mathrm{d} \Omega = 0
+    s_arr = d.get_vec_s_array()
+    w_arr = d.get_omega_array()
+    print(s_arr.shape)
+    print(w_arr.shape)
+    sum_s = 0
+    for i in range(d.num_omega):
+        sum_s += s_arr[i] * w_arr[i]
+    assert np.isclose(sum_s, 0).all()
+    print("$\int_{4\pi} \\vec{s} \mathrm{d} \Omega = $", sum_s)
+    assert np.isclose(np.sum(s_arr * w_arr[:, None], axis=0), 0).all()
+    # conation 3:\int_{4\pi} \vec{s} \vec{s} \mathrm{d} \Omega = 4*pi/3 * unit_vec
+    sum_s = np.sum(s_arr * s_arr * w_arr[:, None], axis=0)
+    print(f"{4.0 * np.pi / 3}")
+    print(sum_s)
+    print(f"err: {(sum_s - 4.0 * np.pi / 3)}")
+    # The half space moment preserving criterion
+    # condition 4: \int_{4\pi} \vec{s}_x \mathrm{d} \Omega = pi (\vec{s}_x > 0)
+    sum_s_x = 0
+    sum_s_y = 0
+    sum_s_z = 0
+    for i in range(d.num_omega):
+        if (s_arr[i][0] < 0):
+            continue
+        sum_s_x += s_arr[i][0] * w_arr[i]
+    for i in range(d.num_omega):
+        if (s_arr[i][1] < 0):
+            continue
+        sum_s_y += s_arr[i][1] * w_arr[i]
+    for i in range(d.num_omega):
+        if (s_arr[i][2] < 0):
+            continue
+        sum_s_z += s_arr[i][2] * w_arr[i]
+    print(f"{np.pi}")
+    print(sum_s_x)
+    print(sum_s_y)
+    print(sum_s_z)
 
 if __name__ == "__main__":
     test_d()
