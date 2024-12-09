@@ -1,14 +1,11 @@
-from matplotlib import pyplot as plt
+import scipy.sparse
+import numpy as np
 from black_body import BlackBody
 from discretization_angle import DiscretizationAngle
-from grid import GridFace, Grid
+from grid import Grid
 from grid_coordinate import GridCoordinate
 from common import *
-import numpy as np
-from scipy.sparse import linalg
 from tqdm import tqdm
-from material_object import MaterialObject
-from shape import Cube, Sphere
 
 
 class FvmRteSolver():
@@ -44,7 +41,7 @@ class FvmRteSolver():
     def set_grid_coordinate(self, grid_coordinate: GridCoordinate):
         self.grid_coord = grid_coordinate
 
-    def set_wavelength_band(self, wavelength_band: np.array([float])):
+    def set_wavelength_band(self, wavelength_band):
         self.lambda_min = wavelength_band[0]
         self.lambda_max = wavelength_band[-1]
         self.lambda_band = wavelength_band
@@ -63,7 +60,6 @@ class FvmRteSolver():
         self.B = self.calculate_black_body_radiant_exitance_band()
         self.grid_coord.generateGridSpace()
         self.grid_coord.initObject(lambda_min, lambda_max)
-        index = self.grid_coord.get_grid_by_point(np.array([0, 0, 0]))
         num_omega = self.discretization_angle.num_omega
         for grid in self.grid_coord.grid:
             grid.intensity = np.zeros((num_omega))
@@ -78,7 +74,10 @@ class FvmRteSolver():
                 s_vec = self.discretization_angle.get_vec_s(t, p)
                 omega = self.discretization_angle.get_omega_by_theta_index(t)
                 omega_index = self.discretization_angle.get_omega_index(t, p)
-                x = self._solve_per_omega(s_vec, omega)
+                x, exit_code = self._solve_per_omega(s_vec, omega)
+                if exit_code != 0:
+                    print(f"WRINGING: Bicgstab can't converge at omega {omega:.4f} or {
+                          omega*180/np.pi:.4f} degree with exit code {exit_code}")
                 for grid in self.grid_coord.grid:
                     grid.intensity[omega_index] = x[self.grid_coord.get_grid_flatten_index(
                         *grid.get_index())]
@@ -97,24 +96,22 @@ class FvmRteSolver():
 
         Returns:
             x: RTE: Ax=b
+            exit_code: exit code of bicgstab
         """
         self.coff_a_matrix, self.coff_b_matrix = self._calculate_coff_matrix(
             s_vec, omega)  # get the A and b
-        x, exit_code = linalg.bicgstab(
-            self.coff_a_matrix, self.coff_b_matrix, tol=1e-3)  # solve the equation
-        # print(self.coff_a_matrix[22,:])
-        # print(self.coff_b_matrix)
-        # print(x)
-        # if exit_code != 0:
-            # print("Solver failed to converge")
-            # raise Exception("Solver failed to converge")
-        return x
+        x, exit_code = scipy.sparse.linalg.bicgstab(
+            self.coff_a_matrix, self.coff_b_matrix)  # solve the equation
+
+        return x, exit_code
 
     def _calculate_coff_matrix(self, s_vec, omega):
         # NOTE: Indeed, we don't need to calculate the coefficient which is on the boundary.
         total_grid_num = self.grid_coord.grid_num
         grid_space_shape = self.grid_coord.grid_space_shape
-        coff_a_matrix = np.zeros((total_grid_num, total_grid_num))
+        coff_a_matrix = scipy.sparse.lil_matrix(
+            (total_grid_num, total_grid_num))
+        # coff_a_matrix = np.zeros((total_grid_num, total_grid_num))
         coff_b_matrix = np.zeros((total_grid_num, 1))
 
         for i in range(1, grid_space_shape[0]-1):
@@ -143,7 +140,7 @@ class FvmRteSolver():
         k_eta = grid.k_eta
         return k_eta * self.B * v * omega / np.pi
 
-    def _get_radiative_flux_density_for_one(self, intensity: np.array([float]), norm_vec: np.array([float])) -> float:
+    def _get_radiative_flux_density_for_one(self, intensity, norm_vec) -> float:
         num_omega = len(intensity)
         s_vec_arr = self.discretization_angle.get_vec_s_array()
         d_omega = np.array(
@@ -154,87 +151,5 @@ class FvmRteSolver():
             res = np.sum(res)
         return res
 
-    def get_radiative_flux_density(self, grid_arr: np.array([Grid]), norm_vec) -> np.array([float]):
+    def get_radiative_flux_density(self, grid_arr, norm_vec):
         return np.array([self._get_radiative_flux_density_for_one(grid.intensity, norm_vec) for grid in grid_arr])
-
-    def only_for_debug_plot_radiative_flux_density(self):
-        # TODO: unfinished
-        norm_x = np.array([1, 0, 0])
-        # get all grid in X = 0 plane
-        grid_arr = np.array(
-            [grid for grid in self.grid_coord.grid if grid.get_index()[0] == 0])
-        yz_shape = (self.grid_coord.ny, self.grid_coord.nz)
-        v = self.get_radiative_flux_density(grid_arr, norm_x).reshape(yz_shape)
-        plt.imshow(v)
-        print(np.unique(v))
-        plt.show()
-
-
-def test_fvm_rte_solver():
-    # Calculate domain size is 5*5*5
-    # Background is transparent
-    # Create a black body with a cube in the center
-    size = 0.5
-    g = GridCoordinate(size, size, size)
-    d = DiscretizationAngle(20)
-    f = FvmRteSolver()
-    f.set_config_before_running(lambda_min=1e-7, lambda_max=1e-2,
-                                temperature=500, grid_coordinate=g, discretization_angle=d)
-
-    # You have to define the spectral absorption coefficient function like this
-    # def function_name(lambda_min, lambda_max, r_vec): { function_body }
-    # IMPORTANT AND TODO: The name of args of the function must be (lambda_min, lambda_max, r_vec)
-    def black_k(lambda_min, lambda_max, r_vec): return 1
-    def transparent_k(lambda_min, lambda_max, r_vec): return 0
-    f.addObject(MaterialObject(
-        shape=Cube(origin=np.array([-2, -2, -2]), end=np.array([2, 2, 10])), k=transparent_k, name="background"
-    ))
-    f.addObject(MaterialObject(
-        shape=Sphere(center=np.array([0, 0, 0]), radius=1), k=black_k, name="black_body"
-    ))
-    f.run()
-    index = f.grid_coord.get_grid_by_point(np.array([0, 0, 0]))
-    print(index.get_index())
-    s_arr = f.discretization_angle.get_vec_s_array()
-    w_arr = f.discretization_angle.get_omega_array()
-    # save data
-    out_dir =  "data_" + random_string(5)
-    import os
-    os.mkdir(out_dir)
-    np.save(f"{out_dir}/s_arr.npy", s_arr)
-    np.save(f"{out_dir}/w_arr.npy", w_arr)
-    g_data = np.array([g.intensity for g in f.grid_coord.grid])
-    np.save(f"{out_dir}/g_data.npy", g_data)
-    np.save(f"{out_dir}/grid_space_shape.npy", f.grid_coord.grid_space_shape)
-
-def plot(data_dir:str):
-    s_arr = np.load(f"{data_dir}/s_arr.npy")
-    w_arr = np.load(f"{data_dir}/w_arr.npy")
-    g_data = np.load(f"{data_dir}/g_data.npy")
-    grid_space_shape = np.load(f"{data_dir}/grid_space_shape.npy")
-    index = Grid(4,4,4,0,0,0)
-    plot_heat_flux_with_r(s_arr,w_arr,g_data, index, 0.5, grid_space_shape)
-    
-def plot_heat_flux_with_r(s_arr,w_arr,g_data, index, size, shape):
-    y = np.array([])
-    for i in range(shape[2]):
-        ii = index.get_index()[0] * shape[1] * shape[2] + index.get_index()[1] * shape[2] + i
-        g = g_data[ii]
-        q_x =np.sum(g * w_arr * np.dot(s_arr, np.array([1, 0, 0]))) 
-        q_y = np.sum(g * w_arr * np.dot(s_arr, np.array([0, 1, 0])))
-        q_z = np.sum(g * w_arr * np.dot(s_arr, np.array([0, 0, 1])))
-        print(q_x, q_y, q_z)
-        y = np.append(y, np.sqrt(q_x**2 + q_y**2 + q_z**2))
-    x = np.arange(-2 + 0.5 * size, 10 + 0.5 * size, size)
-    x = x - x[index.get_index()[2]]
-    plt.figure()
-    plt.plot(x,y, 'o-')
-    plt.grid()
-    plt.xlim([1, 8])
-    plt.ylim([0,1000])
-    plt.show()
-    
-
-if __name__ == "__main__":
-    # test_fvm_rte_solver()
-    plot("data_hZHDA")

@@ -1,6 +1,6 @@
 from common import random_string
 from shape import *
-    
+
 
 class MaterialObject:
     def __init__(self, shape: Cube, k, name=random_string(6)):
@@ -15,7 +15,7 @@ class MaterialObject:
         self.k = k
         self.name = name
 
-    def k_eta(self,  lambda_min: float, lambda_max: float, r_vec: np.array([float])):
+    def k_eta(self,  lambda_min: float, lambda_max: float, r_vec):
         """spectral absorption coefficient
         """
         return self.k(lambda_min=lambda_min, lambda_max=lambda_max, r_vec=r_vec)

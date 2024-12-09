@@ -13,13 +13,13 @@ class GridFace():
     def get_norm_vec(self):
         return self.norm_vec
 
-    def calculate_d(self, s_vec: np.array([float]), omega: float) -> float:
+    def calculate_d(self, s_vec, omega: float) -> float:
         """D^m_j = {vec{s} \cdot vec{n}} \cdot \Omega^m
         """
         return np.dot(self.norm_vec, s_vec) * omega
         # return integrate.quad(lambda x: np.dot(self.norm_vec, s_vec) * x, omega - 0.5*delta_omega, omega + 0.5*delta_omega)[0]
 
-    def calculate_a(self, s_vec: np.array([float]), omega: float) -> float:
+    def calculate_a(self, s_vec, omega: float) -> float:
         """a^m_j = area_j * D^m_j
         """
         return self.calculate_d(s_vec, omega) * self.area
@@ -57,7 +57,7 @@ class Grid():
         self.k_eta = 0  # default value
         self.intensity = np.array([])  # spectral radiation energy
 
-    def _get_coff_initial_a_array(self, s_vec: np.array([float]), omega: float) -> np.array([float]):
+    def _get_coff_initial_a_array(self, s_vec, omega: float):
         """the face of grid: a_j = area_j * D^m_j
         """
         return np.array([face.calculate_a(s_vec, omega)
@@ -72,7 +72,7 @@ class Grid():
         coff_a[coff_a > 0] = 0
         return CoefficientA(a_p, coff_a)
 
-    def get_index(self) -> np.array([int]):
+    def get_index(self):
         return self.index
 
     @property

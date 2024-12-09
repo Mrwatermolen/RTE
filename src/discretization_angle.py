@@ -24,7 +24,7 @@ class DiscretizationAngle():
         self.num_omega = self.num_theta * (self.num_theta + 2)
         assert self.num_omega == np.sum(self.num_phi_arr)
 
-    def _get_num_phi_array(self, n: int) -> np.array([int]):
+    def _get_num_phi_array(self, n: int):
         if (n % 2 != 0):
             raise ValueError("n must be even")
         num = int(n / 2)
@@ -44,7 +44,7 @@ class DiscretizationAngle():
         theta_index = self.get_theta_index_from_omega_index(omega_index)
         return self.get_omega_by_theta_index(theta_index)
 
-    def get_vec_s(self, theta_index: int, phi_index: int) -> np.array([float]):
+    def get_vec_s(self, theta_index: int, phi_index: int):
         """get the solid angle vector
         """
         theta_s = self.get_theta(theta_index)
@@ -68,16 +68,16 @@ class DiscretizationAngle():
         assert t < self.num_theta
         return 2 * np.pi / self.num_phi_arr[t]
 
-    def get_theta_array(self) -> np.array([float]):
+    def get_theta_array(self):
         return np.array([self.get_theta(t) for t in range(self.num_theta)])
 
-    def get_omega_array(self) -> np.array([float]):
+    def get_omega_array(self):
         return np.array([self.get_omega(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
 
-    def get_vec_s_array(self) -> np.array([float]):
+    def get_vec_s_array(self):
         return np.array([self.get_vec_s(t, p) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
 
-    def get_omega_array(self) -> np.array([float]):
+    def get_omega_array(self):
         return np.array([self.get_omega_by_theta_index(t) for t in range(self.num_theta) for p in range(self.num_phi_arr[t])])
 
     def get_omega_index(self, theta_index: int, phi_index: int) -> int:
@@ -99,7 +99,7 @@ class DiscretizationAngle():
         return omega_index - np.sum(self.num_phi_arr[:theta_index])
 
     # Tool for debug
-    def _validate_omega_array(omega_array: np.array([float])) -> bool:
+    def _validate_omega_array(omega_array) -> bool:
         return np.sum(omega_array) == 4 * np.pi
 
 
@@ -160,6 +160,7 @@ def test_d():
     print(sum_s_x)
     print(sum_s_y)
     print(sum_s_z)
+
 
 if __name__ == "__main__":
     test_d()

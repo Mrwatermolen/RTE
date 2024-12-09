@@ -25,7 +25,7 @@ FACE_ORDER_INDEX_OFFSET = np.array([
 ])
 
 
-def closure_face_order(i: int, j: int, k: int) -> np.array([int]):
+def closure_face_order(i: int, j: int, k: int):
     """get the around faces of the grid (i, j, k)
 
     Args:
@@ -42,7 +42,7 @@ class CoefficientA():
     a_face_arr obey the order of the faces closuring the center of grid.
     """
 
-    def __init__(self, a_center: float, a_face_arr: np.array([float])) -> None:
+    def __init__(self, a_center: float, a_face_arr) -> None:
         self.a_center = a_center
         self.a_face_arr = a_face_arr
 
@@ -55,7 +55,7 @@ class FloatCompareOperator(Enum):
     GREATER_THAN_OR_EQUAL = 4
 
 
-def compare_float(a: np.array([float]), op: FloatCompareOperator, b: np.array([float]), epsilon: float = 1e-9) -> bool:
+def compare_float(a, op: FloatCompareOperator, b, epsilon: float = 1e-9) -> bool:
     """compare two float array. If the difference between two float is less than epsilon, we think they are equal.
 
     Args:
