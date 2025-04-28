@@ -6,6 +6,7 @@ from grid import Grid
 from grid_coordinate import GridCoordinate
 from common import *
 from tqdm import tqdm
+from mpi4py import MPI
 
 
 class FvmRteSolver():
@@ -15,6 +16,9 @@ class FvmRteSolver():
 
     def __init__(self) -> None:
         self.black_body = BlackBody(0)
+        self.comm = MPI.COMM_WORLD
+        self.rank = self.comm.Get_rank()
+        self.size = self.comm.Get_size()
 
     def set_config_before_running(self, lambda_min: float, lambda_max: float, temperature: float, grid_coordinate: GridCoordinate, discretization_angle: DiscretizationAngle):
         """_summary_
@@ -68,21 +72,49 @@ class FvmRteSolver():
 
     def _solver_RTE(self):
         num_theta = self.discretization_angle.num_theta
-        pbar = tqdm(total=self.discretization_angle.num_omega)
+        if self.rank == 0:
+            pbar = tqdm(total=self.discretization_angle.num_omega)
+        omega_counter = 0
         for t in range(num_theta):
             for p in range(self.discretization_angle.num_phi_arr[t]):
+                if omega_counter % self.size != self.rank:
+                    omega_counter += 1
+                    continue
+                omega_counter += 1
+                
                 s_vec = self.discretization_angle.get_vec_s(t, p)
                 omega = self.discretization_angle.get_omega_by_theta_index(t)
                 omega_index = self.discretization_angle.get_omega_index(t, p)
                 x, exit_code = self._solve_per_omega(s_vec, omega)
-                if exit_code != 0:
-                    print(f"WRINGING: Bicgstab can't converge at omega {omega:.4f} or {
-                          omega*180/np.pi:.4f} degree with exit code {exit_code}")
+                # if exit_code != 0:
+                #     print(f"WRINGING: Bicgstab can't converge at omega {omega:.4f} or {
+                #           omega*180/np.pi:.4f} degree with exit code {exit_code}")
                 for grid in self.grid_coord.grid:
                     grid.intensity[omega_index] = x[self.grid_coord.get_grid_flatten_index(
                         *grid.get_index())]
-                pbar.update(1)
-        pbar.close()
+                self.comm.Barrier()
+                if self.rank == 0:
+                    pbar.update(self.size)
+                    
+        if self.rank == 0:
+            pbar.close()
+            
+        # collect the result
+        local_grid_intensity = np.array(
+            [grid.intensity for grid in self.grid_coord.grid],dtype=np.float64)
+        toal_grid_intensity = np.zeros(
+            (self.grid_coord.grid_num, self.discretization_angle.num_omega), dtype=np.float64)
+        for g_index in range(self.grid_coord.grid_num):
+            for omega_index in range(self.discretization_angle.num_omega):
+                local_grid_intensity[g_index, omega_index] = self.grid_coord.grid[g_index].intensity[omega_index]
+        self.comm.Reduce(local_grid_intensity, toal_grid_intensity, op=MPI.SUM, root=0)
+        if self.rank == 0:
+            for g_index in range(self.grid_coord.grid_num):
+                self.grid_coord.grid[g_index].intensity = toal_grid_intensity[g_index]
+        
+        if self.rank == 0:
+            print("All omega task finished")
+            
 
     def _solve_per_omega(self, s_vec, omega):
         """solve RTE for one omega

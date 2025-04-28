@@ -72,6 +72,8 @@ def test_fvm_3d(out_dir: str, grid_size=0.5, discretization_angle=4, z_min=-2, z
 
     x, y = fvm_result_z(grid_size, s_arr, w_arr, g_data, f.grid_coord.grid_space_shape,
                         f.grid_coord.get_grid_by_point(np.array([0, 0, 0])), z_min, z_max)
+    if f.rank != 0:
+        return
     plt.figure()
     plt.plot(x, y, 'o-', label="numerical")
     plt.grid()
